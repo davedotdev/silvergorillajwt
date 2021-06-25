@@ -1,6 +1,7 @@
 package silvergorillajwt
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -33,8 +34,15 @@ type SilverGorilla struct {
 }
 
 func (sg SilverGorilla) getPemCert(token *jwt.Token) (string, error) {
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
 	cert := ""
-	resp, err := http.Get(sg.CertURL)
+
+	resp, err := client.Get(sg.CertURL)
 
 	if err != nil {
 		return cert, err
@@ -181,11 +189,13 @@ func (sg SilverGorilla) SilverGorillaMiddlewareHandler(h http.Handler) http.Hand
 		roles, scopes, sub, err := sg.getScopesandSub(AuthHeader)
 
 		if err != nil {
+			fmt.Println("Error: ", err)
 			h.ServeHTTP(w, r)
 			return
 		}
 
 		w.Header().Add("JWT-Sub-ID", sub)
+		fmt.Println("SubID is: ", sub)
 
 		scopeStr := ""
 		lenScopes := len(scopes)

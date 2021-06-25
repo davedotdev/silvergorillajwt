@@ -1,10 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
-
-	"fmt"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	sgj "github.com/davedotdev/silvergorillajwt"
@@ -23,24 +22,37 @@ func basichandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("serving: ", handlerName)
-
 	// These headers can be used for doing auth/role checking
-	fmt.Println(w.Header().Get("JWT-Sub-ID"))
-	fmt.Println(w.Header().Get("JWT-Scopes"))
-	fmt.Println(w.Header().Get("JWT-Roles"))
+	sub := w.Header().Get("JWT-Sub-ID")
+	scopes := w.Header().Get("JWT-Scopes")
+	roles := w.Header().Get("JWT-Roles")
 
-	w.Header().Set("Content-Type", "application/text")
+	type Headers struct {
+		Sub     string `json:"sub"`
+		Scopes  string `json:"scopes"`
+		Roles   string `json:"roles"`
+		Message string `json:"message"`
+	}
 
+	headerStruct := Headers{Sub: sub, Scopes: scopes, Roles: roles, Message: "JWT is valid and you're authorized"}
+	returnBytes, err := json.Marshal(headerStruct)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("JWT is valid and you're authorized\n"))
+	w.Write([]byte(returnBytes))
 }
 
 func main() {
 
+	// These are keycloak examples. Ensure your realm and server address fields are correct.
 	sg := sgj.SilverGorilla{
-		IssStr:  "http://server/auth/realms/testrealm",
-		CertURL: "http://server/auth/realms/testrealm/protocol/openid-connect/certs",
+		IssStr:  "https://192.168.50.100:8443/auth/realms/testrealm",
+		CertURL: "https://192.168.50.100:8443/auth/realms/testrealm/protocol/openid-connect/certs",
 	}
 
 	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
