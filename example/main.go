@@ -19,7 +19,7 @@ func basichandler(w http.ResponseWriter, r *http.Request) {
 
 	const handlerName = "/"
 
-	if ret := sgj.corsHeaders(handlerName, &w, r); ret {
+	if ret := sgj.CorsHeaders(handlerName, &w, r); ret {
 		return
 	}
 
@@ -39,19 +39,19 @@ func basichandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	sg := sgj.SilverGorilla{
-		issStr:  "http://server/auth/realms/testrealm",
+		IssStr:  "http://server/auth/realms/testrealm",
 		CertURL: "http://server/auth/realms/testrealm/protocol/openid-connect/certs",
 	}
 
 	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: sg.validationKeyGetter,
+		ValidationKeyGetter: sg.ValidationKeyGetter,
 		SigningMethod:       jwt.SigningMethodRS256,
 	})
 
 	r := mux.NewRouter()
 
 	// This middleware chain: jwtMiddleware -> silvergorillaMiddlewareHandler -> our function
-	r.Handle("/", jwtMiddleware.Handler(sg.silvergorillaMiddlewareHandler(http.HandlerFunc(basichandler))))
+	r.Handle("/", jwtMiddleware.Handler(sg.SilverGorillaMiddlewareHandler(http.HandlerFunc(basichandler))))
 
 	log.Println("starting server on :4050")
 	err := http.ListenAndServe(":4050", r)

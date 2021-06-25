@@ -3,15 +3,12 @@ package silvergorillajwt
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 
 	"fmt"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/form3tech-oss/jwt-go"
-	"github.com/gorilla/mux"
 )
 
 /*
@@ -31,7 +28,7 @@ import (
 */
 
 type SilverGorilla struct {
-	issStr  string // issuer string for keycloak this would look like: http://{server}/auth/realms/{realm}
+	IssStr  string // issuer string for keycloak this would look like: http://{server}/auth/realms/{realm}
 	CertURL string // certificates, for example with KeyCloak this would be /auth/realms/{realm}/protocol/openid-connect/certs
 }
 
@@ -65,10 +62,10 @@ func (sg SilverGorilla) getPemCert(token *jwt.Token) (string, error) {
 	return cert, nil
 }
 
-func (sg SilverGorilla) validationKeyGetter(token *jwt.Token) (interface{}, error) {
+func (sg SilverGorilla) ValidationKeyGetter(token *jwt.Token) (interface{}, error) {
 
 	// Verify 'iss' claim
-	checkIss := token.Claims.(jwt.MapClaims).VerifyIssuer(sg.issStr, false)
+	checkIss := token.Claims.(jwt.MapClaims).VerifyIssuer(sg.IssStr, false)
 	if !checkIss {
 		fmt.Println("JWT error: invalid issuer")
 		return token, errors.New("invalid issuer")
@@ -108,7 +105,7 @@ func setupCorsResponse(w *http.ResponseWriter, req *http.Request) {
 	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Authorization")
 }
 
-func corsHeaders(name string, w *http.ResponseWriter, req *http.Request) bool {
+func CorsHeaders(name string, w *http.ResponseWriter, req *http.Request) bool {
 	fmt.Printf("%v: checking for preflight and key\n", name)
 	if (*req).Method == "OPTIONS" {
 		setupCorsResponse(w, req)
@@ -177,7 +174,7 @@ func (sg SilverGorilla) getScopesandSub(tokenString string) (scopes []string, re
 	return realmroles, scopes, sub, nil
 }
 
-func (sg SilverGorilla) silvergorillaMiddlewareHandler(h http.Handler) http.Handler {
+func (sg SilverGorilla) SilverGorillaMiddlewareHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		AuthHeader := ""
 		AuthHeader = r.Header.Get("Authorization")
@@ -216,51 +213,4 @@ func (sg SilverGorilla) silvergorillaMiddlewareHandler(h http.Handler) http.Hand
 
 		h.ServeHTTP(w, r)
 	})
-}
-
-// Example use
-
-func basichandler(w http.ResponseWriter, r *http.Request) {
-	// This basic handler uses headers inserted by middleware
-	// for auth capabilities.
-
-	const handlerName = "/"
-
-	if ret := corsHeaders(handlerName, &w, r); ret {
-		return
-	}
-
-	fmt.Println("serving: ", handlerName)
-
-	// These headers can be used for doing auth/role checking
-	fmt.Println(w.Header().Get("JWT-Sub-ID"))
-	fmt.Println(w.Header().Get("JWT-Scopes"))
-	fmt.Println(w.Header().Get("JWT-Roles"))
-
-	w.Header().Set("Content-Type", "application/text")
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("JWT is valid and you're authorized\n"))
-}
-
-func main() {
-
-	sg := SilverGorilla{
-		issStr:  "http://server/auth/realms/testrealm",
-		CertURL: "http://server/auth/realms/testrealm/protocol/openid-connect/certs",
-	}
-
-	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: sg.validationKeyGetter,
-		SigningMethod:       jwt.SigningMethodRS256,
-	})
-
-	r := mux.NewRouter()
-
-	// This middleware chain: jwtMiddleware -> silvergorillaMiddlewareHandler -> our function
-	r.Handle("/", jwtMiddleware.Handler(sg.silvergorillaMiddlewareHandler(http.HandlerFunc(basichandler))))
-
-	log.Println("starting server on :4050")
-	err := http.ListenAndServe(":4050", r)
-	log.Fatal(err)
 }
