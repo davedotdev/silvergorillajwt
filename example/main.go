@@ -62,6 +62,8 @@ func main() {
 
 	r := mux.NewRouter()
 
+	sg.GetJWKs()
+
 	// This middleware chain: jwtMiddleware -> silvergorillaMiddlewareHandler -> our function
 	r.Handle("/", jwtMiddleware.Handler(sg.SilverGorillaMiddlewareHandler(http.HandlerFunc(basichandler))))
 

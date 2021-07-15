@@ -1,7 +1,6 @@
 package silvergorillajwt
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -31,34 +30,35 @@ import (
 type SilverGorilla struct {
 	IssStr  string // issuer string for keycloak this would look like: http://{server}/auth/realms/{realm}
 	CertURL string // certificates, for example with KeyCloak this would be /auth/realms/{realm}/protocol/openid-connect/certs
+	Jwks    Jwks   // JWT Keys
+}
+
+// GetJWKs gets the JWKs from the well known Cert address and populates the sg type.
+func (sg SilverGorilla) GetJWKs() error {
+	resp, err := http.Get(sg.CertURL)
+
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&sg.Jwks)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (sg SilverGorilla) getPemCert(token *jwt.Token) (string, error) {
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-
 	cert := ""
 
-	resp, err := client.Get(sg.CertURL)
-
-	if err != nil {
-		return cert, err
-	}
-	defer resp.Body.Close()
-
-	var jwks = Jwks{}
-	err = json.NewDecoder(resp.Body).Decode(&jwks)
-
-	if err != nil {
-		return cert, err
-	}
-
-	for k := range jwks.Keys {
-		if token.Header["kid"] == jwks.Keys[k].Kid {
-			cert = "-----BEGIN CERTIFICATE-----\n" + jwks.Keys[k].X5c[0] + "\n-----END CERTIFICATE-----"
+	for k := range sg.Jwks.Keys {
+		if token.Header["kid"] == sg.Jwks.Keys[k].Kid {
+			cert = "-----BEGIN CERTIFICATE-----\n" + sg.Jwks.Keys[k].X5c[0] + "\n-----END CERTIFICATE-----"
 		}
 	}
 
